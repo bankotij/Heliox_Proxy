@@ -1,0 +1,77 @@
+# Docker Compose for External Services (Neon + Upstash)
+# Usage: docker-compose -f docker-compose.external.yml up -d --build
+#
+# Requires .env file with:
+#   DATABASE_URL, DATABASE_URL_SYNC, REDIS_URL, SECRET_KEY, ADMIN_API_KEY
+
+services:
+  # =============================================================================
+  # APPLICATION SERVICES (No local postgres/redis - uses external)
+  # =============================================================================
+
+  gateway-api:
+    build:
+      context: ../apps/gateway-api
+      dockerfile: Dockerfile
+      target: production
+    container_name: heliox-gateway
+    env_file:
+      - .env
+    environment:
+      # These can be overridden in .env
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      AUTO_SEED: "true"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../apps/worker
+      dockerfile: Dockerfile
+    container_name: heliox-worker
+    env_file:
+      - .env
+    depends_on:
+      gateway-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  upstream:
+    build:
+      context: ../apps/example-upstream
+      dockerfile: Dockerfile
+    container_name: heliox-upstream
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  admin-ui:
+    build:
+      context: ../ui/admin
+      dockerfile: Dockerfile
+    container_name: heliox-admin
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      gateway-api:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+    name: heliox-network

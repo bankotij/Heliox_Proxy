@@ -1,0 +1,66 @@
+# Demo mode docker-compose (no Redis required)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: heliox-postgres-demo
+    environment:
+      POSTGRES_USER: heliox
+      POSTGRES_PASSWORD: heliox_password
+      POSTGRES_DB: heliox
+    volumes:
+      - postgres_demo_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U heliox"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gateway-api:
+    build:
+      context: ../apps/gateway-api
+      dockerfile: Dockerfile
+    container_name: heliox-gateway-demo
+    environment:
+      DATABASE_URL: postgresql+asyncpg://heliox:heliox_password@postgres:5432/heliox
+      DATABASE_URL_SYNC: postgresql://heliox:heliox_password@postgres:5432/heliox
+      REDIS_URL: ""  # Empty = demo mode
+      DEPLOYMENT_MODE: demo
+      SECRET_KEY: demo-secret-key
+      ADMIN_API_KEY: admin-demo
+      DEBUG: "true"
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  upstream:
+    build:
+      context: ../apps/example-upstream
+      dockerfile: Dockerfile
+    container_name: heliox-upstream-demo
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  admin-ui:
+    build:
+      context: ../ui/admin
+      dockerfile: Dockerfile
+    container_name: heliox-admin-demo
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway-api
+    restart: unless-stopped
+
+volumes:
+  postgres_demo_data:
