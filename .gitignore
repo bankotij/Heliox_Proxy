@@ -15,8 +15,13 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# Python lib folders (but not ui/admin/src/lib)
+/lib/
+/apps/**/lib/
 lib64/
+
+# Allow UI lib folder
+!ui/admin/src/lib/
 parts/
 sdist/
 var/
