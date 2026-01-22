@@ -36,6 +36,16 @@ class ProxyResult:
     upstream_status: int | None = None
 
 
+class NonCacheableUpstreamResponse(Exception):
+    """Raised when an upstream response should bypass caching."""
+
+    def __init__(self, response: httpx.Response, reason: str, latency_ms: int) -> None:
+        super().__init__(reason)
+        self.response = response
+        self.reason = reason
+        self.upstream_latency_ms = latency_ms
+
+
 class GatewayProxy:
     """
     Handles upstream proxying with caching, SWR, and coalescing.
@@ -137,6 +147,26 @@ class GatewayProxy:
                 upstream_status=entry.status_code,
             )
 
+        except NonCacheableUpstreamResponse as exc:
+            logger.info(
+                "Bypassing cache for upstream response",
+                cache_key=cache_key,
+                reason=exc.reason,
+                status_code=exc.response.status_code,
+            )
+            cache_metrics.record_miss()
+            response = Response(
+                content=exc.response.content,
+                status_code=exc.response.status_code,
+                headers=dict(exc.response.headers),
+            )
+            return ProxyResult(
+                response=response,
+                cache_status=CacheStatus.BYPASS,
+                error_type=ErrorType.NONE,
+                upstream_latency_ms=exc.upstream_latency_ms,
+                upstream_status=exc.response.status_code,
+            )
         except Exception as e:
             logger.error("Cache fetch failed", error=str(e), cache_key=cache_key)
             cache_metrics.record_error()
@@ -248,9 +278,17 @@ class GatewayProxy:
         # Check if response is cacheable
         if policy:
             if not policy.is_cacheable_status(response.status_code):
-                raise ValueError(f"Status {response.status_code} not cacheable")
+                raise NonCacheableUpstreamResponse(
+                    response=response,
+                    reason="status_not_cacheable",
+                    latency_ms=latency_ms,
+                )
             if len(response.content) > policy.max_body_bytes:
-                raise ValueError("Response too large to cache")
+                raise NonCacheableUpstreamResponse(
+                    response=response,
+                    reason="body_too_large",
+                    latency_ms=latency_ms,
+                )
 
         # Record 404s in bloom filter
         if response.status_code == 404:
