@@ -1,6 +1,7 @@
 """Tests for caching service."""
 
 import asyncio
+import json
 import time
 
 import pytest
@@ -270,3 +271,17 @@ class TestCacheService:
         
         # But fetch should only have been called once (or at most twice due to timing)
         assert fetch_count <= 2
+
+
+@pytest.mark.parametrize("body", [bytes(range(256)), b"", "Hindi: नमस्ते".encode()])
+def test_response_bytes_survive_cache_serialization(body):
+    entry = CacheEntry(200, {"content-type": "application/octet-stream"}, body,
+                       time.time(), 300, 60)
+    assert CacheEntry.from_json(entry.to_json()).body == body
+
+
+def test_legacy_text_cache_entries_remain_readable():
+    legacy = json.dumps({"status_code": 200, "headers": {}, "body": "café",
+                         "created_at": time.time(), "ttl_seconds": 300,
+                         "stale_seconds": 60})
+    assert CacheEntry.from_json(legacy).body == "café".encode()

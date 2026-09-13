@@ -10,6 +10,7 @@ This module provides a production-grade caching layer with:
 """
 
 import asyncio
+import base64
 import hashlib
 import json
 import time
@@ -50,7 +51,7 @@ class CacheEntry:
         return json.dumps({
             "status_code": self.status_code,
             "headers": self.headers,
-            "body": self.body.decode("utf-8", errors="replace"),
+            "body_base64": base64.b64encode(self.body).decode("ascii"),
             "created_at": self.created_at,
             "ttl_seconds": self.ttl_seconds,
             "stale_seconds": self.stale_seconds,
@@ -64,7 +65,11 @@ class CacheEntry:
         return cls(
             status_code=parsed["status_code"],
             headers=parsed["headers"],
-            body=parsed["body"].encode("utf-8"),
+            body=(
+                base64.b64decode(parsed["body_base64"], validate=True)
+                if "body_base64" in parsed
+                else parsed["body"].encode("utf-8")
+            ),
             created_at=parsed["created_at"],
             ttl_seconds=parsed["ttl_seconds"],
             stale_seconds=parsed["stale_seconds"],
