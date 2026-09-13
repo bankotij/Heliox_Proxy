@@ -23,7 +23,7 @@ export default function ApiKeysPage() {
   
   const { data: keys = [], isLoading } = useQuery({
     queryKey: ['api-keys'],
-    queryFn: () => adminApi.getApiKeys(),
+    queryFn: () => adminApi.getKeys(),
   })
   
   const { data: tenants = [] } = useQuery({
@@ -32,7 +32,7 @@ export default function ApiKeysPage() {
   })
   
   const createMutation = useMutation({
-    mutationFn: adminApi.createApiKey,
+    mutationFn: adminApi.createKey,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] })
       setCreatedKey(data.key || null)
@@ -41,21 +41,21 @@ export default function ApiKeysPage() {
   
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<ApiKey> }) =>
-      adminApi.updateApiKey(id, data),
+      adminApi.updateKey(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] })
     },
   })
   
   const deleteMutation = useMutation({
-    mutationFn: adminApi.deleteApiKey,
+    mutationFn: adminApi.deleteKey,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] })
     },
   })
   
   const rotateMutation = useMutation({
-    mutationFn: adminApi.rotateApiKey,
+    mutationFn: adminApi.rotateKey,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] })
       setCreatedKey(data.key || null)

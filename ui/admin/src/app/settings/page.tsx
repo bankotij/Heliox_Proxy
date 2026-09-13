@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { setAdminKey, adminApi } from '@/lib/api'
 import { Key, Save, Check } from 'lucide-react'
 
 export default function SettingsPage() {
@@ -17,7 +16,6 @@ export default function SettingsPage() {
   
   const handleSave = () => {
     localStorage.setItem('adminKey', adminKey)
-    setAdminKey(adminKey)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

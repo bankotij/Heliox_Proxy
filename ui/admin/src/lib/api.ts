@@ -30,6 +30,7 @@ async function fetchApi<T>(
     throw new Error(error.detail || `HTTP ${response.status}`)
   }
 
+  if (response.status === 204) return undefined as T
   return response.json()
 }
 
@@ -54,8 +55,9 @@ export interface ApiKey {
   is_active: boolean
   rate_limit_rps: number
   rate_limit_burst: number
-  daily_quota: number
-  monthly_quota: number
+  quota_daily: number
+  quota_monthly: number
+  status: string
   daily_usage?: number
   monthly_usage?: number
   created_at: string
@@ -65,7 +67,7 @@ export interface ApiKey {
 export interface Route {
   id: string
   tenant_id?: string
-  policy_id: string
+  policy_id: string | null
   name: string
   description: string
   path_pattern: string
@@ -85,7 +87,10 @@ export interface CachePolicy {
   ttl_seconds: number
   stale_seconds: number
   vary_headers_json: string[]
-  cacheable_methods: string[]
+  cache_no_store: boolean
+  cache_private: boolean
+  max_body_bytes: number
+  route_count: number
   cacheable_statuses_json: number[]
   created_at: string
 }
@@ -111,12 +116,15 @@ export interface HealthStatus {
   components: Record<string, { status: string }>
 }
 
-export interface BlockedKey {
+export interface BlockRule {
+  id: string
   api_key_id: string
   reason: string
-  score: number
+  reason_detail: string | null
+  anomaly_score: number | null
   blocked_at: string
-  blocked_until: string
+  blocked_until: string | null
+  is_active: boolean
 }
 
 export interface RequestLog {
@@ -279,13 +287,14 @@ export const adminApi = {
   },
 
   // Abuse Management
-  getBlockedKeys: async (): Promise<BlockedKey[]> => {
+  getBlockedKeys: async (): Promise<BlockRule[]> => {
     return fetchApi('/admin/abuse/blocked')
   },
 
-  unblockKey: async (keyId: string): Promise<void> => {
+  unblockKey: async (keyId: string, reason: string): Promise<void> => {
     return fetchApi(`/admin/abuse/unblock/${keyId}`, {
       method: 'POST',
+      body: JSON.stringify({ reason }),
     })
   },
 
